@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidate Dashboard — AI Interview Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="navbar">
+    <div>
+      <span class="eyebrow">Candidate Portal</span>
+      <h2 id="welcomeMsg" style="margin:2px 0 0 0;">Welcome</h2>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <a href="interview-setup.html" class="btn btn-primary btn-sm">⚡ Start Practice Interview</a>
+      <button class="btn btn-outline btn-sm" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+
+  <div class="grid grid-4" style="margin-bottom:20px;">
+    <div class="card stat-card">
+      <div class="stat-num" id="avgOverall">—</div>
+      <div class="stat-label">Average Score</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="avgTechnical">—</div>
+      <div class="stat-label">Technical Depth</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="avgCommunication">—</div>
+      <div class="stat-label">Communication Pace</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="totalInterviews">—</div>
+      <div class="stat-label">Completed Sessions</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:16px;">Scheduled Interviews</h3>
+        <span class="badge badge-info" id="upcomingCountBadge">0 Pending</span>
+      </div>
+      <div id="upcomingList" class="muted" style="font-size:13.5px;">No interviews scheduled yet.</div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:16px;">Recent Interview History</h3>
+        <a href="candidate-history.html" style="font-size:12.5px;">View all history →</a>
+      </div>
+      <div id="historyList" class="muted" style="font-size:13.5px;">No completed interviews yet.</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await Api.requireAuth("job_seeker");
+  if (!user) return;
+
+  document.getElementById("welcomeMsg").textContent = "Welcome back, " + user.name;
+
+  try {
+    const data = await Api.getCandidateDashboard();
+    const metrics = data.metrics;
+    const upcoming = data.upcoming || [];
+    const history = data.recent_completed || [];
+
+    document.getElementById("avgOverall").textContent = metrics.avg_overall ? metrics.avg_overall + "%" : "—";
+    document.getElementById("avgTechnical").textContent = metrics.avg_technical ? metrics.avg_technical + "%" : "—";
+    document.getElementById("avgCommunication").textContent = metrics.avg_communication ? metrics.avg_communication + "%" : "—";
+    document.getElementById("totalInterviews").textContent = metrics.completed_count || 0;
+
+    // Upcoming & Active Interviews
+    const activeCount = (metrics.scheduled_count !== undefined) ? (metrics.scheduled_count + (metrics.in_progress_count || 0)) : upcoming.length;
+    document.getElementById("upcomingCountBadge").textContent = `${activeCount} Active`;
+    if (upcoming.length) {
+      document.getElementById("upcomingList").innerHTML = upcoming.map(i => {
+        const isScheduled = i.status === "scheduled";
+        const btnText = isScheduled ? "Start Interview" : "Resume Interview";
+        const badge = isScheduled 
+          ? '<span class="badge badge-info" style="font-size:11px;">Scheduled</span>' 
+          : '<span class="badge badge-warning" style="font-size:11px;">In Progress</span>';
+        const dateTime = (i.scheduled_date || "Date TBA") + (i.scheduled_time ? " at " + i.scheduled_time : "");
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--glass-border);gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <strong>${i.job_role}</strong>
+                ${badge}
+              </div>
+              <div class="muted" style="font-size:12px;margin-top:2px;">${dateTime} · Focus: ${i.interview_type}</div>
+            </div>
+            <a href="interview-room.html?id=${i.id}" class="btn btn-sm btn-primary">${btnText}</a>
+          </div>
+        `;
+      }).join("");
+    } else {
+      document.getElementById("upcomingList").innerHTML = `<div class="muted" style="font-size:13.5px;">No active or scheduled interviews right now.</div>`;
+    }
+
+    // History
+    if (history.length) {
+      document.getElementById("historyList").innerHTML = history.map(i => {
+        const score = i.report ? `${i.report.overall_score}%` : "Completed";
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--glass-border);">
+            <div>
+              <strong>${i.job_role}</strong>
+              <div class="muted" style="font-size:12px;">${new Date(i.created_at).toLocaleDateString()} · Score: <strong style="color:var(--grad-start);">${score}</strong></div>
+            </div>
+            <a href="report.html?id=${i.id}" class="btn btn-sm btn-outline">View Report</a>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (err) {
+    console.warn("Error loading dashboard data:", err);
+  }
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    Api.logout();
+  });
+});
+</script>
+</body>
+</html>

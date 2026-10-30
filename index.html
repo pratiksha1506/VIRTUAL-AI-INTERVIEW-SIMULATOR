@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Mock Interview Simulator — Adaptive Voice & Vision Preparation</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container" style="max-width:960px;">
+  <!-- Hero Section -->
+  <div class="text-center" style="margin-top:40px;margin-bottom:36px;">
+    <span class="eyebrow" style="letter-spacing:0.1em;background:rgba(79,70,229,0.1);padding:4px 12px;border-radius:999px;">
+      Next-Generation Career Tech
+    </span>
+    <h1 style="font-size:36px;margin:12px 0 8px 0;letter-spacing:-0.02em;">
+      AI-Powered Mock Interview Simulator
+    </h1>
+    <p class="muted" style="font-size:16px;max-width:620px;margin:0 auto 16px auto;line-height:1.6;">
+      Master your technical and behavioral interviews with real-time dynamic AI questioning, voice interaction, local camera posture telemetry, and detailed hiring committee evaluations.
+    </p>
+
+    <!-- Engine Status Pill -->
+    <!-- <div id="healthBadge" style="display:inline-flex;align-items:center;gap:8px;background:var(--grad-surface);border:1px solid rgba(79,70,229,0.2);padding:6px 16px;border-radius:999px;font-size:12.5px;color:var(--text-dark);">
+      <span>⚙️</span><span id="healthText">Connecting to backend AI engine…</span>
+    </div>
+  </div> -->
+
+  <!-- Feature Grid Highlights -->
+  <!-- <div class="grid grid-3" style="margin-bottom:32px;">
+    <div class="card" style="padding:18px;">
+      <div style="font-size:24px;margin-bottom:8px;">🎯</div>
+      <h4 style="margin:0 0 6px 0;">Adaptive AI Questions</h4>
+      <p class="muted" style="font-size:13px;margin:0;line-height:1.5;">
+        Continuous, role-specific questions that dynamically adapt based on depth, trade-offs, and concepts in your previous answers.
+      </p>
+    </div>
+
+    <div class="card" style="padding:18px;">
+      <div style="font-size:24px;margin-bottom:8px;">🎙</div>
+      <h4 style="margin:0 0 6px 0;">Voice & Editable Transcripts</h4>
+      <p class="muted" style="font-size:13px;margin:0;line-height:1.5;">
+        Natural speech question playback with voice controls, live speech-to-text, and real-time editable transcript refinement.
+      </p>
+    </div>
+
+    <div class="card" style="padding:18px;">
+      <div style="font-size:24px;margin-bottom:8px;">📹</div>
+      <h4 style="margin:0 0 6px 0;">Local Presentation Guidance</h4>
+      <p class="muted" style="font-size:13px;margin:0;line-height:1.5;">
+        100% client-side camera framing and lighting checks. Zero video storage; purely advisory positioning assistance.
+      </p>
+    </div>
+  </div> -->
+
+  <!-- Portals Selection -->
+  <div class="grid grid-2" style="max-width:760px;margin:0 auto 40px auto;">
+    <!-- Job Seeker Card -->
+    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+      <div>
+        <div class="eyebrow" style="color:var(--grad-start);">Candidate Portal</div>
+        <h3 style="margin:4px 0 8px 0;">Job Seeker</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.5;margin-bottom:18px;">
+          Configure customized practice sessions, upload your resume for personalized questions, and practice out loud.
+        </p>
+      </div>
+      <div>
+        <a href="login-candidate.html" class="btn btn-primary btn-block" style="margin-bottom:10px;">Sign In as Candidate</a>
+        <a href="register.html" class="btn btn-outline btn-block">Create New Account</a>
+      </div>
+    </div>
+
+    <!-- Admin Card -->
+    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+      <div>
+        <div class="eyebrow" style="color:var(--text-dark);">Examiner Portal</div>
+        <h3 style="margin:4px 0 8px 0;">Recruiter & Admin</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.5;margin-bottom:18px;">
+          Schedule mock interviews, manage candidate directories, and review comprehensive AI evaluation reports.
+        </p>
+      </div>
+      <div>
+        <a href="login-admin.html" class="btn btn-dark btn-block" style="margin-bottom:8px;">Admin Login</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- <p class="text-center muted" style="font-size:12px;margin-bottom:30px;">
+    AI Mock Interview Simulator · Engineered for high-fidelity technical & behavioral preparation.
+  </p> -->
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const healthText = document.getElementById("healthText");
+  try {
+    const health = await Api.getHealth();
+    healthText.textContent = `Backend Ready · Engine: ${health.provider} (${health.model})`;
+  } catch (err) {
+    healthText.textContent = "Backend offline. Launch server with: python -m uvicorn backend.app.main:app --port 8000";
+  }
+});
+</script>
+</body>
+</html>

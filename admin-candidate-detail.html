@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidate Profile — Admin Console</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <!-- Navbar -->
+  <div class="navbar">
+    <div>
+      <span class="eyebrow">Recruiter & Examiner Portal</span>
+      <h2 style="margin:2px 0 0 0;">Candidate Profile Details</h2>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="admin-dashboard.html" class="btn btn-outline btn-sm">← Back to Candidates</a>
+      <a href="admin-history.html" class="btn btn-outline btn-sm">Interview History</a>
+      <button class="btn btn-outline btn-sm" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+
+  <!-- Candidate Information Card -->
+  <div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div id="candidateAvatar" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg, var(--grad-start), var(--grad-end));color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">
+          ?
+        </div>
+        <div>
+          <h2 id="candidateName" style="margin:0 0 4px 0;font-size:22px;">Candidate Name</h2>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <code id="candidateEmail" style="font-size:13.5px;">email@example.com</code>
+            <span class="badge badge-success">● Active Account</span>
+            <span id="candidateMemberSince" class="muted" style="font-size:12.5px;"></span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <a id="scheduleForCandidateBtn" href="schedule-interview.html" class="btn btn-primary btn-sm">+ Schedule Interview</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Candidate's Interview History -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0;font-size:17px;">Interview Attempts & Assigned Sessions</h3>
+        <p class="muted" style="margin:2px 0 0 0;font-size:12.5px;">All recorded mock sessions for this candidate.</p>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Target Role</th>
+            <th>Interview Focus</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="interviewsBody">
+          <tr><td colspan="6" class="muted text-center" style="padding:24px;">Loading candidate sessions…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const admin = await Api.requireAuth("admin");
+  if (!admin) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const candidateId = params.get("id");
+  if (!candidateId) {
+    window.location.href = "admin-dashboard.html";
+    return;
+  }
+
+  document.getElementById("scheduleForCandidateBtn").href = `schedule-interview.html?candidateId=${candidateId}`;
+
+  try {
+    const data = await Api.getAdminCandidate(candidateId);
+    const candidate = data.candidate;
+    const interviews = data.interviews || [];
+
+    document.getElementById("candidateName").textContent = candidate.name;
+    document.getElementById("candidateEmail").textContent = candidate.email;
+    document.getElementById("candidateAvatar").textContent = candidate.name.charAt(0).toUpperCase();
+    document.getElementById("candidateMemberSince").textContent = `Member since ${new Date(candidate.created_at).toLocaleDateString()}`;
+
+    const tbody = document.getElementById("interviewsBody");
+    if (!interviews.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="muted text-center" style="padding:28px;">No interview records for this candidate yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = interviews.map(i => {
+      const isCompleted = i.status === "completed";
+      let badgeClass = "badge-secondary";
+      if (i.status === "completed") badgeClass = "badge-success";
+      else if (i.status === "in_progress") badgeClass = "badge-warning";
+      else if (i.status === "scheduled") badgeClass = "badge-info";
+      else if (i.status === "cancelled") badgeClass = "badge-danger";
+      else if (i.status === "missed") badgeClass = "badge-secondary";
+
+      const reportLink = isCompleted ? `<a href="report.html?id=${i.id}" class="btn btn-sm btn-outline">View Report</a>` : "";
+
+      return `
+        <tr>
+          <td><strong>${i.job_role}</strong></td>
+          <td>${i.interview_type} · ${i.difficulty}</td>
+          <td><span class="badge ${badgeClass}">${i.status}</span></td>
+          <td>${new Date(i.created_at).toLocaleDateString()}</td>
+          <td>${isCompleted ? 'Evaluated' : '—'}</td>
+          <td>${reportLink}</td>
+        </tr>
+      `;
+    }).join("");
+
+  } catch (err) {
+    document.getElementById("interviewsBody").innerHTML = `<tr><td colspan="6" class="muted text-center" style="color:var(--danger);padding:20px;">Error: ${err.message}</td></tr>`;
+  }
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    Api.logout();
+  });
+});
+</script>
+</body>
+</html>

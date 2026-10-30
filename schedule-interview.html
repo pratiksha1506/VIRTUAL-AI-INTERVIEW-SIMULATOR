@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule Mock Interview — Admin Portal</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container-narrow" style="margin-top:24px;">
+  <div style="margin-bottom:12px;">
+    <a href="admin-dashboard.html" class="btn btn-outline btn-sm">← Back to Admin Console</a>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow" style="margin-bottom:4px;">Administration</div>
+    <h2 style="margin-bottom:6px;">Schedule Candidate Mock Interview</h2>
+    <p class="muted" style="font-size:13.5px;margin-bottom:18px;">
+      Assign an AI-evaluated mock interview session to a registered candidate.
+    </p>
+
+    <div id="errorAlert" class="alert alert-error" style="display:none;"></div>
+
+    <form id="scheduleForm">
+      <div class="form-group">
+        <label class="form-label" for="candidateId">Select Candidate</label>
+        <select id="candidateId" class="form-control" required>
+          <option value="">Loading candidate directory…</option>
+        </select>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label class="form-label" for="jobRole">Job Role</label>
+          <select id="jobRole" class="form-control" required>
+            <option>Software Developer</option>
+            <option>Frontend Developer</option>
+            <option>Backend Developer</option>
+            <option>Data Analyst</option>
+            <option>HR Interview</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="interviewType">Interview Type</label>
+          <select id="interviewType" class="form-control" required>
+            <option>Technical</option>
+            <option>Behavioral</option>
+            <option>Situational</option>
+            <option>HR</option>
+            <option>Mixed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label class="form-label" for="difficulty">Difficulty</label>
+          <select id="difficulty" class="form-control" required>
+            <option>Easy</option>
+            <option selected>Medium</option>
+            <option>Hard</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="questionCount">Question Count (1–50)</label>
+          <input type="number" id="questionCount" min="1" max="50" class="form-control" value="10" required>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label class="form-label" for="scheduledDate">Scheduled Date</label>
+          <input type="date" id="scheduledDate" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="scheduledTime">Scheduled Time</label>
+          <input type="time" id="scheduledTime" class="form-control" required>
+        </div>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-primary btn-block" style="padding:12px;">
+        📅 Confirm & Schedule Interview
+      </button>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const admin = await Api.requireAuth("admin");
+  if (!admin) return;
+
+  const select = document.getElementById("candidateId");
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselectId = urlParams.get("candidateId");
+
+  try {
+    const data = await Api.getAdminCandidates();
+    const candidates = data.candidates || [];
+    select.innerHTML = candidates.length
+      ? candidates.map(c => `<option value="${c.id}">${c.name} (${c.email})</option>`).join("")
+      : `<option value="">No candidates registered yet</option>`;
+
+    if (preselectId && select.querySelector(`option[value="${preselectId}"]`)) {
+      select.value = preselectId;
+    }
+  } catch (err) {
+    select.innerHTML = `<option value="">Error loading candidates</option>`;
+  }
+
+  try {
+    const settings = await Api.getAdminSettings();
+    if (settings && settings.default_question_count) {
+      document.getElementById("questionCount").value = settings.default_question_count;
+    }
+  } catch (e) {}
+
+  document.getElementById("scheduleForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (!select.value) {
+      alert("Please select a candidate.");
+      return;
+    }
+
+    const submitBtn = document.getElementById("submitBtn");
+    const errorAlert = document.getElementById("errorAlert");
+    errorAlert.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Scheduling session…";
+
+    try {
+      await Api.scheduleInterview({
+        candidateId: Number(select.value),
+        jobRole: document.getElementById("jobRole").value,
+        interviewType: document.getElementById("interviewType").value,
+        difficulty: document.getElementById("difficulty").value,
+        questionCount: parseInt(document.getElementById("questionCount").value, 10),
+        scheduledDate: document.getElementById("scheduledDate").value,
+        scheduledTime: document.getElementById("scheduledTime").value
+      });
+      window.location.href = "admin-history.html";
+    } catch (err) {
+      errorAlert.textContent = err.message || "Failed to schedule interview.";
+      errorAlert.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "📅 Confirm & Schedule Interview";
+    }
+  });
+});
+</script>
+</body>
+</html>

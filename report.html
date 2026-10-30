@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comprehensive AI Interview Performance Report</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <div class="navbar">
+    <div>
+      <a href="candidate-dashboard.html" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+      <h2 style="margin:6px 0 0 0;font-size:22px;">Candidate Performance Report</h2>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn btn-primary btn-sm btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <div id="loadingBox" class="card text-center" style="padding:40px;">
+    <h3>Generating Comprehensive AI Evaluation…</h3>
+    <p class="muted">Synthesizing transcripts, domain depth, speech telemetry, and recommended model answers…</p>
+  </div>
+
+  <div id="reportContainer" style="display:none;">
+    <!-- Metadata Banner -->
+    <div class="card" id="metaCard" style="background:var(--grad-surface);"></div>
+
+    <!-- Engine Banner -->
+    <div id="scoringEngineBanner" class="engine-banner">
+      <span id="engineLabel">Evaluation Engine: -</span>
+      <span style="font-size:11.5px;opacity:0.85;">Transparent Multi-Category Rubric</span>
+    </div>
+
+    <!-- High-Level Score Cards -->
+    <div class="grid grid-4" id="scoreCards" style="margin-bottom:20px;"></div>
+
+    <!-- Charts Grid: Category Radar / Bar + Question Trend -->
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <h4 style="margin-bottom:12px;">Competency Score Breakdown</h4>
+        <div style="max-height:240px;display:flex;justify-content:center;">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h4 style="margin-bottom:12px;">Question Score Trajectory</h4>
+        <div style="max-height:240px;">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strengths, Improvement & Practice Exercises Grid -->
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="card">
+        <h4 style="color:#047857;display:flex;align-items:center;gap:6px;">
+          <span>✓</span><span>Key Strengths</span>
+        </h4>
+        <ul id="strengthsList" style="padding-left:18px;font-size:13.5px;line-height:1.6;margin-bottom:0;"></ul>
+      </div>
+
+      <div class="card">
+        <h4 style="color:#b45309;display:flex;align-items:center;gap:6px;">
+          <span>→</span><span>Areas for Growth</span>
+        </h4>
+        <ul id="weaknessesList" style="padding-left:18px;font-size:13.5px;line-height:1.6;margin-bottom:0;"></ul>
+      </div>
+
+      <div class="card">
+        <h4 style="color:var(--grad-start);display:flex;align-items:center;gap:6px;">
+          <span>📚</span><span>Recommended Practice</span>
+        </h4>
+        <ul id="practiceList" style="padding-left:18px;font-size:13.5px;line-height:1.6;margin-bottom:0;"></ul>
+      </div>
+    </div>
+
+    <!-- Detailed Question-by-Question Breakdown with Model Answers -->
+    <div class="card">
+      <h3 style="margin-bottom:14px;">Question-by-Question Detailed Analysis & Model Answers</h3>
+      <p class="muted" style="font-size:13px;margin-top:-6px;margin-bottom:16px;">
+        Compare your actual spoken answer against the evaluated critique and senior-level model answer.
+      </p>
+      <div id="questionsContainer"></div>
+    </div>
+
+    <!-- Presentation Observations (Decoupled from Technical Score) -->
+    <div class="card" id="presentationCard" style="background:rgba(0,0,0,0.02);">
+      <h4 style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        <span>📹</span><span>Presentation & Speech Telemetry</span>
+      </h4>
+      <div id="presentationContent" style="font-size:13px;color:var(--text-body);line-height:1.5;"></div>
+      <div class="form-hint" style="margin-top:8px;">
+        ⚠️ <strong>Note:</strong> Presentation observations are approximate local indicators and are strictly decoupled from your core technical competency score.
+      </div>
+    </div>
+
+    <!-- Comprehensive Summary Feedback -->
+    <div class="card" style="margin-bottom:30px;">
+      <h4 style="margin-bottom:8px;">Hiring Committee Comprehensive Assessment</h4>
+      <div id="overallFeedback" style="font-size:14px;line-height:1.65;white-space:pre-line;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const params = new URLSearchParams(window.location.search);
+  const interviewId = params.get("id");
+
+  if (!interviewId) {
+    window.location.href = "candidate-dashboard.html";
+    return;
+  }
+
+  const user = await Api.requireAuth();
+  if (!user) return;
+
+  try {
+    const data = await Api.getReport(interviewId);
+    renderReport(data);
+  } catch (err) {
+    document.getElementById("loadingBox").innerHTML = `
+      <div class="alert alert-error">Failed to load report: ${err.message}</div>
+      <p><a href="candidate-dashboard.html">← Return to Dashboard</a></p>
+    `;
+  }
+});
+
+function renderReport(data) {
+  document.getElementById("loadingBox").style.display = "none";
+  document.getElementById("reportContainer").style.display = "block";
+
+  const interview = data.interview;
+  const report = data.report;
+  const responses = data.responses || [];
+
+  // Metadata Card
+  document.getElementById("metaCard").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div>
+        <span class="eyebrow">Mock Interview Report</span>
+        <h2 style="margin:2px 0;">${interview.job_role} (${interview.experience_level || "Mid-Level"})</h2>
+        <div class="muted" style="font-size:13px;margin-top:4px;">
+          <strong>Mode:</strong> ${interview.interview_type} &nbsp;·&nbsp;
+          <strong>Difficulty:</strong> ${interview.difficulty} &nbsp;·&nbsp;
+          <strong>Date:</strong> ${new Date(interview.created_at).toLocaleDateString()}
+        </div>
+      </div>
+      <div>
+        <span class="badge ${interview.status === 'completed' ? 'badge-success' : 'badge-warning'}" style="font-size:13px;padding:6px 14px;">
+          ${interview.status.toUpperCase()}
+        </span>
+      </div>
+    </div>
+  `;
+
+  // Engine label
+  document.getElementById("engineLabel").textContent = `Evaluation Engine: ${report.scoring_engine}`;
+
+  // Stat Cards
+  document.getElementById("scoreCards").innerHTML = `
+    <div class="card stat-card">
+      <div class="stat-num">${report.overall_score}%</div>
+      <div class="stat-label">Overall Readiness</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num">${report.technical_score}%</div>
+      <div class="stat-label">Technical Depth</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num">${report.communication_score}%</div>
+      <div class="stat-label">Communication & Pace</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num">${responses.length} / ${interview.question_count}</div>
+      <div class="stat-label">Questions Evaluated</div>
+    </div>
+  `;
+
+  // Strengths, Weaknesses, Recommendations
+  document.getElementById("strengthsList").innerHTML = (report.strengths || []).map(s => `<li style="margin-bottom:6px;">${s}</li>`).join("");
+  document.getElementById("weaknessesList").innerHTML = (report.weaknesses || []).map(w => `<li style="margin-bottom:6px;">${w}</li>`).join("");
+  document.getElementById("practiceList").innerHTML = (report.practice_exercises || []).map(p => `<li style="margin-bottom:6px;">${p}</li>`).join("");
+
+  // Detailed Questions Container with Model Answers
+  const modelAnswersMap = {};
+  (report.model_answers || []).forEach(m => {
+    modelAnswersMap[m.question_number] = m;
+  });
+
+  const questionsHtml = responses.map((r, i) => {
+    const qNum = i + 1;
+    const model = modelAnswersMap[qNum] || {};
+    const critique = model.critique || "Solid foundational explanation provided.";
+    const modelAnswer = model.model_answer || "A senior engineer would explain architecture, edge cases, and business impact.";
+
+    return `
+      <div style="border:1px solid var(--glass-border);border-radius:12px;padding:16px;margin-bottom:14px;background:rgba(255,255,255,0.4);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <h4 style="margin:0;font-size:15px;color:var(--text-dark);">
+            <span style="color:var(--grad-start);font-weight:800;">Q${qNum}:</span> ${r.question_text || `Question ${qNum}`}
+          </h4>
+          <span class="badge ${r.overall_score >= 70 ? 'badge-success' : 'badge-warning'}" style="font-size:12px;font-weight:700;">
+            ${r.overall_score}% Score
+          </span>
+        </div>
+
+        <div style="margin:10px 0;background:rgba(0,0,0,0.03);padding:10px 12px;border-radius:8px;font-size:13.5px;">
+          <div style="font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">
+            Candidate's Answer Transcript:
+          </div>
+          <div style="font-style:italic;line-height:1.45;">"${r.transcript || '(No response recorded)'}"</div>
+        </div>
+
+        <div style="margin:10px 0;font-size:13px;line-height:1.5;">
+          <strong>AI Critique:</strong> ${critique}
+        </div>
+
+        <div style="background:rgba(79,70,229,0.06);border-left:3px solid var(--grad-start);padding:10px 14px;border-radius:4px;font-size:13px;line-height:1.5;">
+          <strong style="color:var(--grad-start);">Recommended Model Answer:</strong>
+          <div style="margin-top:3px;">${modelAnswer}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("questionsContainer").innerHTML = questionsHtml || "<p class='muted'>No question responses recorded.</p>";
+
+  // Presentation Observations
+  const pres = report.presentation_observations || {};
+  document.getElementById("presentationContent").innerHTML = `
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:6px;">
+      <div><strong>Average Speaking Cadence:</strong> ${pres.avg_wpm || 120} WPM (Words/min)</div>
+      <div><strong>Total Filler Words Detected:</strong> ${pres.filler_word_total !== undefined ? pres.filler_word_total : 0}</div>
+      <div><strong>Camera Mode:</strong> ${interview.camera_enabled ? 'Enabled' : 'Disabled'}</div>
+    </div>
+    <div>${pres.disclaimer || 'Visual and pacing telemetry is advisory only.'}</div>
+  `;
+
+  // Overall Assessment
+  document.getElementById("overallFeedback").textContent = report.overall_feedback || "The candidate completed the mock interview successfully.";
+
+  // Chart 1: Competency Breakdown Bar Chart
+  const ctxCategory = document.getElementById("categoryChart");
+  new Chart(ctxCategory, {
+    type: "bar",
+    data: {
+      labels: ["Content Relevance", "Technical Depth", "Communication", "Problem Solving"],
+      datasets: [{
+        label: "Score",
+        data: [report.content_score, report.technical_score, report.communication_score, report.problem_solving_score],
+        backgroundColor: ["rgba(79, 70, 229, 0.75)", "rgba(124, 58, 237, 0.75)", "rgba(16, 185, 129, 0.75)", "rgba(245, 158, 11, 0.75)"],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100 } }
+    }
+  });
+
+  // Chart 2: Question Score Trend
+  const ctxTrend = document.getElementById("trendChart");
+  new Chart(ctxTrend, {
+    type: "line",
+    data: {
+      labels: responses.map((_, i) => "Q" + (i + 1)),
+      datasets: [{
+        label: "Question Score",
+        data: responses.map(r => r.overall_score),
+        borderColor: "#4F46E5",
+        backgroundColor: "rgba(79, 70, 229, 0.15)",
+        fill: true,
+        tension: 0.35,
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100 } }
+    }
+  });
+}
+</script>
+</body>
+</html>

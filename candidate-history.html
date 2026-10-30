@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview History — AI Interview Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="navbar">
+    <div>
+      <a href="candidate-dashboard.html" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+      <h2 style="margin:8px 0 0 0;">Your Complete Interview History</h2>
+    </div>
+    <a href="interview-setup.html" class="btn btn-primary btn-sm">+ New Practice Session</a>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Type</th>
+          <th>Difficulty</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Score</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="7" class="muted">Loading interview history…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await Api.requireAuth("job_seeker");
+  if (!user) return;
+
+  try {
+    const data = await Api.getCandidateHistory();
+    const list = data.interviews || [];
+
+    if (!list.length) {
+      document.getElementById("historyBody").innerHTML = `<tr><td colspan="7" class="muted text-center" style="padding:24px;">No interviews recorded yet. <a href="interview-setup.html">Start your first practice session!</a></td></tr>`;
+      return;
+    }
+
+    document.getElementById("historyBody").innerHTML = list.map(i => {
+      const isCompleted = i.status === "completed";
+      let badgeClass = "badge-secondary";
+      let score = "—";
+      let actionLink = "—";
+
+      if (i.status === "completed") {
+        badgeClass = "badge-success";
+        score = i.report ? `${i.report.overall_score}%` : "Evaluated";
+        actionLink = `<a href="report.html?id=${i.id}" class="btn btn-sm btn-outline">View Report</a>`;
+      } else if (i.status === "in_progress") {
+        badgeClass = "badge-warning";
+        score = "In Progress";
+        actionLink = `<a href="interview-room.html?id=${i.id}" class="btn btn-sm btn-primary">Resume</a>`;
+      } else if (i.status === "scheduled") {
+        badgeClass = "badge-info";
+        score = "Scheduled";
+        actionLink = `<a href="interview-room.html?id=${i.id}" class="btn btn-sm btn-primary">Start Interview</a>`;
+      } else if (i.status === "cancelled") {
+        badgeClass = "badge-danger";
+        score = "—";
+        actionLink = `<span class="muted">Cancelled</span>`;
+      } else if (i.status === "missed") {
+        badgeClass = "badge-secondary";
+        score = "—";
+        actionLink = `<span class="muted">Missed</span>`;
+      }
+
+      return `
+        <tr>
+          <td><strong>${i.job_role}</strong></td>
+          <td>${i.interview_type}</td>
+          <td><span class="badge badge-${(i.difficulty||'medium').toLowerCase()}">${i.difficulty || 'Medium'}</span></td>
+          <td><span class="badge ${badgeClass}">${i.status}</span></td>
+          <td>${new Date(i.created_at).toLocaleDateString()}</td>
+          <td><strong style="color:var(--grad-start);">${score}</strong></td>
+          <td>${actionLink}</td>
+        </tr>
+      `;
+    }).join("");
+  } catch (err) {
+    document.getElementById("historyBody").innerHTML = `<tr><td colspan="7" class="muted">Error loading history: ${err.message}</td></tr>`;
+  }
+});
+</script>
+</body>
+</html>

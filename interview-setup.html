@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configure Practice Interview — AI Interview Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container-narrow" style="margin-top:24px;">
+  <div style="margin-bottom:14px;">
+    <a href="candidate-dashboard.html" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow" style="margin-bottom:4px;">Tailored Simulation Setup</div>
+    <h2 style="margin-bottom:6px;">Configure Your Practice Interview</h2>
+    <p class="muted" style="font-size:13.5px;margin-bottom:20px;">
+      The AI will customize questions, depth, and follow-ups based on your selected role and experience.
+    </p>
+
+    <div id="errorAlert" class="alert alert-error" style="display:none;"></div>
+
+    <form id="setupForm">
+      <div class="form-group">
+        <label class="form-label" for="jobRole">Target Job Role</label>
+        <select id="jobRole" class="form-control" required>
+          <option selected>Software Developer</option>
+          <option>Frontend Developer</option>
+          <option>Backend Developer</option>
+          <option>Data Analyst</option>
+          <option>HR Interview</option>
+        </select>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label class="form-label" for="experienceLevel">Experience Level</label>
+          <select id="experienceLevel" class="form-control" required>
+            <option>Entry-Level / Junior</option>
+            <option selected>Mid-Level</option>
+            <option>Senior</option>
+            <option>Lead / Principal</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="interviewType">Interview Focus</label>
+          <select id="interviewType" class="form-control" required>
+            <option selected>Technical</option>
+            <option>Behavioral</option>
+            <option>Situational</option>
+            <option>HR</option>
+            <option>Mixed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="difficulty">Question Difficulty</label>
+        <select id="difficulty" class="form-control" required>
+          <option>Easy</option>
+          <option selected>Medium</option>
+          <option>Hard</option>
+        </select>
+      </div>
+
+      <!-- Resume Upload (Optional) -->
+      <div class="form-group" style="background:var(--grad-surface);padding:14px;border-radius:var(--radius-sm);border:1px dashed var(--glass-border);">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+          <span>📄</span><span>Upload Resume / CV (Optional)</span>
+        </label>
+        <p class="muted" style="font-size:12px;margin:2px 0 8px 0;">
+          Upload a resume(PDF, TXT, DOCX, MD).
+        </p>
+        <input type="file" id="resumeFile" class="form-control" accept=".pdf,.txt,.docx,.md" style="font-size:12.5px;">
+        <div id="resumeStatus" style="font-size:12px;margin-top:6px;display:none;"></div>
+      </div>
+
+      <!-- Camera Consent Toggle -->
+      <div class="form-group">
+        <label style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;cursor:pointer;color:var(--text-dark);">
+          <input type="checkbox" id="cameraEnabled" style="margin-top:3px;">
+          <div>
+            <strong>Enable Camera for Presentation Guidance (Optional)</strong>
+            <!-- <div class="muted" style="font-size:12px;line-height:1.4;margin-top:2px;">
+              Provides real-time local positioning and lighting assistance in your browser. Video frames are never stored or uploaded. The interview works completely with voice or text even if camera is disabled.
+            </div> -->
+          </div>
+        </label>
+      </div>
+
+      <button type="submit" id="startBtn" class="btn btn-primary btn-block" style="padding:12px;font-size:15px;">
+        🚀 Launch AI Interview Session
+      </button>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+let extractedResumeText = "";
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await Api.requireAuth("job_seeker");
+  if (!user) return;
+
+  const resumeFileInput = document.getElementById("resumeFile");
+  const resumeStatus = document.getElementById("resumeStatus");
+
+  resumeFileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    resumeStatus.style.display = "block";
+    resumeStatus.textContent = "Extracting resume details…";
+    resumeStatus.className = "muted";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await Api.uploadResume(formData);
+      extractedResumeText = res.extracted_text || "";
+      resumeStatus.textContent = `✓ Resume parsed successfully (${file.name})`;
+      resumeStatus.className = "badge badge-success";
+    } catch (err) {
+      resumeStatus.textContent = "Warning: Could not parse file. Standard questions will be used.";
+      resumeStatus.className = "badge badge-warning";
+    }
+  });
+
+  document.getElementById("setupForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const startBtn = document.getElementById("startBtn");
+    const errorAlert = document.getElementById("errorAlert");
+    errorAlert.style.display = "none";
+    startBtn.disabled = true;
+    startBtn.textContent = "Preparing your AI interview room…";
+
+    try {
+      const payload = {
+        jobRole: document.getElementById("jobRole").value,
+        experienceLevel: document.getElementById("experienceLevel").value,
+        interviewType: document.getElementById("interviewType").value,
+        difficulty: document.getElementById("difficulty").value,
+        cameraEnabled: document.getElementById("cameraEnabled").checked,
+        resumeText: extractedResumeText || null
+      };
+
+      const res = await Api.createInterview(payload);
+      window.location.href = "interview-room.html?id=" + res.interview.id;
+    } catch (err) {
+      errorAlert.textContent = err.message || "Failed to start interview. Please retry.";
+      errorAlert.style.display = "block";
+      startBtn.disabled = false;
+      startBtn.textContent = "🚀 Launch AI Interview Session";
+    }
+  });
+});
+</script>
+</body>
+</html>

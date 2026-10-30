@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidate Management — Admin Console</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <!-- Navbar -->
+  <div class="navbar">
+    <div>
+      <span class="eyebrow">Recruiter & Examiner Portal</span>
+      <h2 style="margin:2px 0 0 0;">Admin Management Console</h2>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="schedule-interview.html" class="btn btn-primary btn-sm">+ Schedule Interview</a>
+      <button class="btn btn-outline btn-sm" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+
+  <!-- Primary Admin Navigation Options -->
+  <div class="admin-nav-tabs">
+    <a href="admin-dashboard.html" class="admin-nav-tab active">
+      <span>👥</span> Candidate Management
+    </a>
+    <a href="admin-history.html" class="admin-nav-tab">
+      <span>📋</span> Interview History
+    </a>
+  </div>
+
+  <!-- Overview Stats -->
+  <div class="grid grid-4" style="margin-bottom:20px;">
+    <div class="card stat-card">
+      <div class="stat-num" id="statSeekers">0</div>
+      <div class="stat-label">Registered Candidates</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="statCompleted">0</div>
+      <div class="stat-label">Completed Interviews</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="statScheduled">0</div>
+      <div class="stat-label">Scheduled Sessions</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-num" id="statTotal">0</div>
+      <div class="stat-label">Total Sessions</div>
+    </div>
+  </div>
+
+  <!-- Interview Question Scheduling Policy Widget -->
+  <div class="card" style="margin-bottom:24px;border-left:4px solid var(--grad-start);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <h3 style="margin:0;font-size:16px;">⚙️ Interview Question Scheduling & Policy</h3>
+        <p class="muted" style="margin:4px 0 0 0;font-size:12.5px;">
+          Configure persistent default question count (1 to 50) for newly scheduled interviews.
+        </p>
+      </div>
+      <div id="settingsSaveStatus" class="badge badge-success" style="display:none;">Saved</div>
+    </div>
+    <form id="settingsForm" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label for="defaultQuestionCount" style="font-weight:600;font-size:13.5px;">Default Questions:</label>
+        <input type="number" id="defaultQuestionCount" min="1" max="50" class="form-control" style="width:90px;" value="10" required>
+      </div>
+      <button type="submit" id="saveSettingsBtn" class="btn btn-primary btn-sm">💾 Save Question Setting</button>
+    </form>
+  </div>
+
+  <!-- Section 1: Candidate Management -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h3 style="margin:0;font-size:17px;">👥 Registered Candidates Directory</h3>
+        <p class="muted" style="margin:4px 0 0 0;font-size:13px;">
+          Only genuinely registered candidates with active accounts are shown.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="candidateSearchInput" class="form-control" placeholder="Search by name or email…" style="width:240px;font-size:13px;">
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Email</th>
+            <th>Registered Date</th>
+            <th>Account Status</th>
+            <th>Interviews</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="candidatesBody">
+          <tr><td colspan="6" class="muted text-center" style="padding:24px;">Loading registered candidates…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+let allCandidates = [];
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const admin = await Api.requireAuth("admin");
+  if (!admin) return;
+
+  try {
+    const data = await Api.getAdminDashboard();
+    const stats = data.stats;
+    allCandidates = data.candidates || [];
+
+    document.getElementById("statSeekers").textContent = stats.seekers_count;
+    document.getElementById("statTotal").textContent = stats.total_interviews;
+    document.getElementById("statScheduled").textContent = stats.scheduled_count;
+    document.getElementById("statCompleted").textContent = stats.completed_count;
+
+    renderCandidates(allCandidates);
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    document.getElementById("candidatesBody").innerHTML = `<tr><td colspan="6" class="muted text-center" style="color:var(--danger);padding:20px;">Error loading candidates: ${err.message}</td></tr>`;
+  }
+
+  // Load Settings
+  try {
+    const settings = await Api.getAdminSettings();
+    if (settings && settings.default_question_count) {
+      document.getElementById("defaultQuestionCount").value = settings.default_question_count;
+    }
+  } catch (e) {}
+
+  // Save Settings
+  document.getElementById("settingsForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById("saveSettingsBtn");
+    const status = document.getElementById("settingsSaveStatus");
+    const countVal = parseInt(document.getElementById("defaultQuestionCount").value, 10);
+    if (isNaN(countVal) || countVal < 1 || countVal > 50) {
+      alert("Please specify a valid question count between 1 and 50.");
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+    try {
+      await Api.updateAdminSettings({ key: "default_question_count", value: countVal });
+      status.textContent = `✓ Saved (${countVal} questions)`;
+      status.style.display = "inline-block";
+      setTimeout(() => { status.style.display = "none"; }, 4000);
+    } catch (err) {
+      alert("Failed to save setting: " + (err.message || err));
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "💾 Save Question Setting";
+    }
+  });
+
+  // Real-time Search
+  document.getElementById("candidateSearchInput").addEventListener("input", (e) => {
+    const term = e.target.value.trim().toLowerCase();
+    const filtered = allCandidates.filter(c => 
+      c.name.toLowerCase().includes(term) || c.email.toLowerCase().includes(term)
+    );
+    renderCandidates(filtered);
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    Api.logout();
+  });
+});
+
+function renderCandidates(list) {
+  const tbody = document.getElementById("candidatesBody");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted text-center" style="padding:28px;">No registered candidates match your search.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(c => {
+    const dateStr = new Date(c.created_at).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+    const interviewCount = c.interview_count !== undefined ? c.interview_count : 0;
+    const completedCount = c.completed_count !== undefined ? c.completed_count : 0;
+
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg, var(--grad-start), var(--grad-end));color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">
+              ${c.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <strong>${c.name}</strong>
+            </div>
+          </div>
+        </td>
+        <td><code>${c.email}</code></td>
+        <td>${dateStr}</td>
+        <td><span class="badge badge-success">● Active</span></td>
+        <td>
+          <span style="font-weight:600;">${completedCount}</span> completed
+          <span class="muted" style="font-size:12px;">(${interviewCount} total)</span>
+        </td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <a href="admin-candidate-detail.html?id=${c.id}" class="btn btn-sm btn-outline">View Profile</a>
+            <a href="schedule-interview.html?candidateId=${c.id}" class="btn btn-sm btn-primary">Schedule</a>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+</script>
+</body>
+</html>

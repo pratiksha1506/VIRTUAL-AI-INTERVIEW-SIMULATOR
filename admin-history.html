@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview History & Audits — Admin Console</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <!-- Navbar -->
+  <div class="navbar">
+    <div>
+      <span class="eyebrow">Recruiter & Examiner Portal</span>
+      <h2 style="margin:2px 0 0 0;">Admin Management Console</h2>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="schedule-interview.html" class="btn btn-primary btn-sm">+ Schedule Interview</a>
+      <button class="btn btn-outline btn-sm" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+
+  <!-- Primary Admin Navigation Options -->
+  <div class="admin-nav-tabs">
+    <a href="admin-dashboard.html" class="admin-nav-tab">
+      <span>👥</span> Candidate Management
+    </a>
+    <a href="admin-history.html" class="admin-nav-tab active">
+      <span>📋</span> Interview History
+    </a>
+  </div>
+
+  <!-- Section 2: Interview History -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h3 style="margin:0;font-size:18px;">📋 Comprehensive Interview History</h3>
+        <p class="muted" style="margin:4px 0 0 0;font-size:13px;">
+          Audit completed mock interviews, candidate answer transcripts, AI scoring breakdowns, and evaluations.
+        </p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="clearHistoryBtn" class="btn btn-sm btn-outline" style="color:var(--danger);border-color:rgba(239, 68, 68, 0.3);">
+          🗑️ Clear History
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:var(--grad-surface);padding:14px;border-radius:var(--radius-md);border:1px solid var(--glass-border);">
+      <div style="flex:1;min-width:200px;">
+        <label class="form-label" style="font-size:12px;margin-bottom:4px;">Search Candidate or Role</label>
+        <input type="text" id="searchInput" class="form-control" placeholder="Type candidate name, email, or role…" style="font-size:13px;">
+      </div>
+      <div style="width:160px;">
+        <label class="form-label" style="font-size:12px;margin-bottom:4px;">Filter by Status</label>
+        <select id="statusFilter" class="form-control" style="font-size:13px;">
+          <option value="all">All Statuses</option>
+          <option value="completed">Completed</option>
+          <option value="in_progress">In Progress</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="missed">Missed</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button id="resetFiltersBtn" class="btn btn-outline btn-sm" style="margin-top:22px;">Reset</button>
+      </div>
+      <div style="margin-left:auto;align-self:flex-end;">
+        <span id="resultCountBadge" class="badge badge-info" style="font-size:12px;">0 Records</span>
+      </div>
+    </div>
+
+    <!-- Interviews Table -->
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Role & Focus</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Total Score</th>
+            <th>Tech Score</th>
+            <th>Comm Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="8" class="muted text-center" style="padding:28px;">Loading interview records…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Turn-by-Turn Audit Modal -->
+<div id="auditModal" class="audit-modal" style="display:none;">
+  <div class="audit-modal-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-border);padding-bottom:12px;margin-bottom:16px;">
+      <div>
+        <h3 id="modalTitle" style="margin:0;font-size:17px;">Interview Audit Breakdown</h3>
+        <p id="modalSubtitle" class="muted" style="margin:2px 0 0 0;font-size:12.5px;"></p>
+      </div>
+      <button id="closeModalBtn" class="btn btn-outline btn-sm" style="font-size:14px;padding:4px 10px;">✕ Close</button>
+    </div>
+
+    <div id="modalBody">
+      <div class="muted text-center" style="padding:20px;">Loading audit details…</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script>
+let allInterviews = [];
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const admin = await Api.requireAuth("admin");
+  if (!admin) return;
+
+  await loadHistory();
+
+  // Search & Filter Events
+  document.getElementById("searchInput").addEventListener("input", applyFilters);
+  document.getElementById("statusFilter").addEventListener("change", applyFilters);
+  document.getElementById("resetFiltersBtn").addEventListener("click", () => {
+    document.getElementById("searchInput").value = "";
+    document.getElementById("statusFilter").value = "all";
+    applyFilters();
+  });
+
+  // Clear History Action
+  document.getElementById("clearHistoryBtn").addEventListener("click", async () => {
+    const confirmed = confirm(
+      "Are you sure you want to clear all previous interview history?\n\n" +
+      "This will remove historical interview attempts, candidate answers, and reports.\n" +
+      "All registered candidate accounts and credentials will remain completely safe.\n\n" +
+      "Click OK to proceed."
+    );
+    if (!confirmed) return;
+
+    try {
+      await Api.clearAdminHistory();
+      alert("Interview history has been cleared successfully. Registered candidate accounts are preserved.");
+      await loadHistory();
+    } catch (err) {
+      alert("Error clearing history: " + err.message);
+    }
+  });
+
+  // Close Audit Modal
+  document.getElementById("closeModalBtn").addEventListener("click", () => {
+    document.getElementById("auditModal").style.display = "none";
+  });
+
+  window.addEventListener("click", (e) => {
+    const modal = document.getElementById("auditModal");
+    if (e.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    Api.logout();
+  });
+});
+
+async function loadHistory() {
+  const tbody = document.getElementById("historyBody");
+  tbody.innerHTML = `<tr><td colspan="8" class="muted text-center" style="padding:28px;">Loading interview records…</td></tr>`;
+
+  try {
+    const res = await Api.getAdminHistory();
+    allInterviews = res.interviews || [];
+    applyFilters();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="muted text-center" style="color:var(--danger);padding:24px;">Failed to load interview history: ${err.message}</td></tr>`;
+  }
+}
+
+function applyFilters() {
+  const term = document.getElementById("searchInput").value.trim().toLowerCase();
+  const status = document.getElementById("statusFilter").value.toLowerCase();
+
+  const filtered = allInterviews.filter(i => {
+    const matchesSearch = !term || (
+      (i.candidate_name && i.candidate_name.toLowerCase().includes(term)) ||
+      (i.candidate_email && i.candidate_email.toLowerCase().includes(term)) ||
+      (i.job_role && i.job_role.toLowerCase().includes(term)) ||
+      (i.interview_type && i.interview_type.toLowerCase().includes(term))
+    );
+    const matchesStatus = status === "all" || (i.status && i.status.toLowerCase() === status);
+    return matchesSearch && matchesStatus;
+  });
+
+  document.getElementById("resultCountBadge").textContent = `${filtered.length} of ${allInterviews.length} Records`;
+  renderHistory(filtered);
+}
+
+function renderHistory(list) {
+  const tbody = document.getElementById("historyBody");
+  if (!list.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="muted text-center" style="padding:36px;">
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px;">No interview records found</div>
+          <div style="font-size:13px;">Newly completed or scheduled interviews will automatically appear here.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = list.map(i => {
+    const isCompleted = i.status === "completed";
+    let badgeClass = "badge-secondary";
+    if (i.status === "completed") badgeClass = "badge-success";
+    else if (i.status === "in_progress") badgeClass = "badge-warning";
+    else if (i.status === "scheduled") badgeClass = "badge-info";
+    else if (i.status === "cancelled") badgeClass = "badge-danger";
+    else if (i.status === "missed") badgeClass = "badge-secondary";
+
+    const dateStr = new Date(i.created_at).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+
+    const report = i.report;
+    const totalScore = report && report.overall_score !== undefined
+      ? `<strong style="color:var(--grad-start);font-size:14px;">${report.overall_score}%</strong>`
+      : `<span class="muted">—</span>`;
+
+    const techScore = report && report.technical_score !== undefined
+      ? `<span>${report.technical_score}%</span>`
+      : `<span class="muted">—</span>`;
+
+    const commScore = report && report.communication_score !== undefined
+      ? `<span>${report.communication_score}%</span>`
+      : `<span class="muted">—</span>`;
+
+    const reportBtn = isCompleted
+      ? `<a href="report.html?id=${i.id}" class="btn btn-sm btn-outline">Report</a>`
+      : "";
+
+    const auditBtn = `<button class="btn btn-sm btn-primary" onclick="openAuditModal(${i.id})">Audit</button>`;
+
+    const cancelBtn = i.status === "scheduled"
+      ? `<button class="btn btn-sm btn-danger" onclick="cancelSession(${i.id})">Cancel</button>`
+      : "";
+
+    return `
+      <tr>
+        <td>
+          <strong>${i.candidate_name || 'Candidate'}</strong>
+          <div class="muted" style="font-size:11.5px;">${i.candidate_email || ''}</div>
+        </td>
+        <td>
+          <div><strong>${i.job_role}</strong></div>
+          <div class="muted" style="font-size:12px;">${i.interview_type} · ${i.difficulty}</div>
+        </td>
+        <td>${dateStr}</td>
+        <td><span class="badge ${badgeClass}">${i.status}</span></td>
+        <td>${totalScore}</td>
+        <td>${techScore}</td>
+        <td>${commScore}</td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${reportBtn}
+            ${auditBtn}
+            ${cancelBtn}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function openAuditModal(interviewId) {
+  const modal = document.getElementById("auditModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalSubtitle = document.getElementById("modalSubtitle");
+  const modalBody = document.getElementById("modalBody");
+
+  modal.style.display = "flex";
+  modalBody.innerHTML = `<div class="muted text-center" style="padding:32px;">Loading turn-by-turn evaluation records…</div>`;
+
+  try {
+    const data = await Api.getAdminInterviewAudit(interviewId);
+    const intv = data.interview;
+    const questions = data.questions || [];
+    const responses = data.responses || [];
+    const report = data.report;
+
+    modalTitle.textContent = `Interview Audit: ${intv.job_role} (${intv.interview_type})`;
+    modalSubtitle.textContent = `Candidate: ${intv.candidate_name} (${intv.candidate_email}) · Date: ${new Date(intv.created_at).toLocaleString()}`;
+
+    let html = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;margin-bottom:20px;">
+        <div style="background:var(--grad-surface);padding:12px;border-radius:var(--radius-sm);text-align:center;">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;">Overall Score</div>
+          <div style="font-size:22px;font-weight:700;color:var(--grad-start);">${report ? report.overall_score + '%' : 'Pending'}</div>
+        </div>
+        <div style="background:var(--grad-surface);padding:12px;border-radius:var(--radius-sm);text-align:center;">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;">Technical</div>
+          <div style="font-size:22px;font-weight:700;">${report ? report.technical_score + '%' : '—'}</div>
+        </div>
+        <div style="background:var(--grad-surface);padding:12px;border-radius:var(--radius-sm);text-align:center;">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;">Communication</div>
+          <div style="font-size:22px;font-weight:700;">${report ? report.communication_score + '%' : '—'}</div>
+        </div>
+        <div style="background:var(--grad-surface);padding:12px;border-radius:var(--radius-sm);text-align:center;">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;">Status</div>
+          <div style="font-size:16px;font-weight:700;margin-top:4px;">${intv.status.toUpperCase()}</div>
+        </div>
+      </div>
+    `;
+
+    if (report && report.overall_feedback) {
+      html += `
+        <div style="margin-bottom:20px;padding:12px 16px;background:var(--glass-bg);border-left:4px solid var(--grad-start);border-radius:var(--radius-sm);font-size:13.5px;">
+          <strong>Executive Feedback:</strong> ${report.overall_feedback}
+        </div>
+      `;
+    }
+
+    html += `<h4 style="margin:0 0 12px 0;font-size:15px;">Questions & Candidate Answers (${responses.length} Answered)</h4>`;
+
+    if (!questions.length) {
+      html += `<div class="muted" style="padding:16px;">No questions recorded for this session yet.</div>`;
+    } else {
+      html += questions.map((q, idx) => {
+        const resp = responses.find(r => r.question_id === q.id) || responses[idx];
+        const answered = !!resp;
+
+        let turnFeedback = "";
+        if (resp && resp.feedback) {
+          if (typeof resp.feedback === "string") {
+            turnFeedback = resp.feedback;
+          } else if (resp.feedback.summary) {
+            turnFeedback = resp.feedback.summary;
+          } else if (resp.feedback.strengths && resp.feedback.strengths.length) {
+            turnFeedback = "Strengths: " + resp.feedback.strengths.join("; ");
+          }
+        }
+
+        return `
+          <div style="border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:14px;margin-bottom:12px;background:var(--glass-bg);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;">
+              <div>
+                <span class="badge badge-info" style="font-size:11px;">Question ${q.sequence_num || (idx + 1)}</span>
+                <span class="muted" style="font-size:12px;margin-left:6px;">Topic: ${q.topic || 'General'} · ${q.difficulty}</span>
+              </div>
+              <div>
+                ${answered ? `<span class="badge badge-success" style="font-size:11px;">Score: ${resp.overall_score || resp.technical_score || 'Evaluated'}</span>` : '<span class="badge badge-secondary" style="font-size:11px;">Unanswered</span>'}
+              </div>
+            </div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--text-dark);">
+              ${q.question_text}
+            </div>
+
+            ${answered ? `
+              <div style="background:rgba(0,0,0,0.03);padding:10px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:8px;">
+                <div class="muted" style="font-size:11px;font-weight:600;margin-bottom:2px;">CANDIDATE TRANSCRIPT:</div>
+                ${resp.transcript || '<span class="muted">[No audio/text transcript]</span>'}
+              </div>
+              ${turnFeedback ? `
+                <div style="font-size:12.5px;color:var(--grad-start);">
+                  <strong>AI Turn Feedback:</strong> ${turnFeedback}
+                </div>
+              ` : ''}
+            ` : `
+              <div class="muted" style="font-size:12.5px;font-style:italic;">Candidate did not submit an answer for this prompt.</div>
+            `}
+          </div>
+        `;
+      }).join("");
+    }
+
+    modalBody.innerHTML = html;
+  } catch (err) {
+    modalBody.innerHTML = `<div class="muted text-center" style="color:var(--danger);padding:20px;">Error loading audit details: ${err.message}</div>`;
+  }
+}
+
+async function cancelSession(id) {
+  if (confirm("Are you sure you want to cancel this scheduled interview?")) {
+    try {
+      await Api.cancelInterview(id);
+      await loadHistory();
+    } catch (e) {
+      alert("Error cancelling interview: " + e.message);
+    }
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice & Video Interview Room — Mock Interview Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="navbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="candidate-dashboard.html" class="btn btn-outline btn-sm">← Exit to Dashboard</a>
+      <span style="font-weight:700;font-size:16.5px;color:var(--text-dark);">AI Interview Session</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="diffBadge" class="badge badge-basic">Medium</span>
+      <span id="timerBadge" class="recording-timer" style="display:inline-block;">⏱ 00:00</span>
+      <span class="muted" id="qCounter" style="font-size:13.5px;font-weight:600;">Question 1 / 5</span>
+      <button id="endInterviewEarlyBtn" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:rgba(239,68,68,0.3);">
+        End Interview
+      </button>
+    </div>
+  </div>
+
+  <!-- Real AI / Fallback Banner -->
+  <div id="aiEngineBanner" class="engine-banner" style="display:flex;">
+    <span id="aiEngineText"></span>
+    <span style="font-size:11.5px;opacity:0.85;"></span>
+  </div>
+
+  <!-- Progress Bar & Dots -->
+  <div style="margin-bottom:18px;">
+    <div id="progressDots" style="display:flex;gap:6px;align-items:center;"></div>
+  </div>
+
+  <div class="grid grid-2">
+    <!-- Left Column: Question, Audio Controls & Answer Submission -->
+    <div>
+      <!-- Question Card -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:8px;">
+            <span class="badge badge-secondary" id="qType">Technical</span>
+            <span class="badge badge-secondary" id="qTopic">Core Concept</span>
+          </div>
+          <!-- Audio Playback Controls -->
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="replayQuestionBtn" class="btn btn-outline btn-sm" title="Replay question audio">
+              🔊 Replay
+            </button>
+            <button id="pauseAudioBtn" class="btn btn-outline btn-sm" title="Pause / Resume speech">
+              ⏸ Pause
+            </button>
+            <button id="muteAudioBtn" class="btn btn-outline btn-sm" title="Mute speech">
+              🔇 Mute
+            </button>
+          </div>
+        </div>
+
+        <h3 id="qText" style="margin-top:12px;font-size:18.5px;line-height:1.48;">Loading interview question…</h3>
+
+        <!-- AI Speaker Animation Bar -->
+        <div id="aiSpeakerBox" class="ai-speaker-container">
+          <div class="speaking-wave" id="speakingWave" style="display:none;">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div id="interviewerStateBadge" class="state-badge state-speaking">
+            🔊 AI is asking...
+          </div>
+          <span class="muted" id="speakingHelp" style="font-size:12px;margin-left:auto;">
+            Listen carefully to the question
+          </span>
+        </div>
+      </div>
+
+      <!-- Candidate Answer Card -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;color:var(--text-dark);">
+            <span>🎤 Candidate Response</span>
+            <span id="recordingIndicator" style="display:none;" class="mic-indicator"></span>
+          </div>
+          <div id="answerTimerBadge" class="recording-timer" style="display:none;">
+            ⏱ 00:00
+          </div>
+        </div>
+
+        <div id="recordingStatus" class="muted" style="font-size:13px;margin-bottom:12px;">
+          Please listen while the AI interviewer speaks the question…
+        </div>
+
+        <div id="recordingError" class="alert alert-warning" style="display:none;"></div>
+
+        <!-- Action Controls -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+          <button id="startBtn" class="btn btn-primary" disabled>
+            🎤 Start Voice Answer
+          </button>
+          <button id="stopBtn" class="btn btn-danger" style="display:none;">
+            ■ Stop Answer
+          </button>
+          <button id="retryBtn" class="btn btn-outline" style="display:none;">
+            ↺ Record Again
+          </button>
+          <button id="submitBtn" class="btn btn-success" style="display:none;">
+            🚀 Submit Answer
+          </button>
+          <button id="toggleInputModeBtn" class="btn btn-outline btn-sm" style="margin-left:auto;">
+            ⌨ Switch to Text Only
+          </button>
+        </div>
+
+        <!-- Editable Transcript & Text Answer Box -->
+        <div style="margin-top:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label" style="margin-bottom:0;font-size:12.5px;text-transform:uppercase;letter-spacing:0.04em;">
+              Editable Answer Transcript:
+            </label>
+            <span id="wordCountBadge" class="muted" style="font-size:11.5px;">0 words</span>
+          </div>
+          <textarea id="editableTranscript" class="editable-transcript-area" rows="4" 
+            placeholder="Your spoken words will appear here in real-time. You can edit, format, or type directly into this box anytime before submitting."></textarea>
+          <!-- <div class="form-hint">
+            💡 Tip: Review and polish your transcript or add code snippets before clicking Submit.
+          </div> -->
+        </div>
+      </div>
+
+      <!-- Turn Feedback Panel -->
+      <div id="resultPanel" class="feedback-card" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h4 style="margin:0;font-size:15.5px;">Turn Evaluation</h4>
+          <span id="qFeedbackBadge" class="badge badge-success">Evaluated</span>
+        </div>
+
+        <!-- Score Breakdown Grid -->
+        <div class="grid grid-4" style="margin-bottom:14px;">
+          <div class="score-box">
+            <div class="score-val" id="scoreContent">-</div>
+            <div class="score-lbl">Content</div>
+          </div>
+          <div class="score-box">
+            <div class="score-val" id="scoreTech">-</div>
+            <div class="score-lbl">Technical</div>
+          </div>
+          <div class="score-box">
+            <div class="score-val" id="scoreCommunication">-</div>
+            <div class="score-lbl">Fluency</div>
+          </div>
+          <div class="score-box">
+            <div class="score-val" id="scoreOverall">-</div>
+            <div class="score-lbl">Score / 100</div>
+          </div>
+        </div>
+
+        <!-- Strengths & Improvements -->
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#047857;margin-bottom:4px;">
+            ✓ Strengths
+          </div>
+          <div id="strengthsList"></div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#b45309;margin-bottom:4px;">
+            → Points to Refine
+          </div>
+          <div id="improvementsList"></div>
+        </div>
+
+        <div style="font-size:12px;color:var(--text-muted);background:rgba(0,0,0,0.03);padding:8px 12px;border-radius:8px;margin-bottom:14px;">
+          <div><strong>Speech Delivery:</strong> <span id="speechObsText">-</span></div>
+          <div style="margin-top:3px;"><strong>Presentation Feedback:</strong> <span id="visualObsText">-</span></div>
+        </div>
+
+        <button id="nextQuestionBtn" class="btn btn-primary btn-block">
+          Next Question (AI adapts to your answer) →
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Column: Local Camera Assist & Interview Telemetry -->
+    <div>
+      <div class="card text-center">
+        <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <span>Camera & Presentation Guidance</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="toggleCameraBtn" class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11.5px;">
+              Camera: On
+            </button>
+            <span id="camStatusBadge" class="badge badge-secondary">Initializing</span>
+          </div>
+        </div>
+        
+        <div class="camera-container" id="cameraBox">
+          <video id="cameraPreview" autoplay muted playsinline></video>
+          <div class="camera-guide-box" id="guideBox" title="Position your face inside this framing guide"></div>
+          <div class="camera-telemetry-overlay" id="telemetryOverlay" style="display:none;">
+            <span id="telemetryFraming">Face: Scanning…</span>
+            <span id="telemetryLighting">Lighting: Checking…</span>
+          </div>
+        </div>
+
+        <div id="cameraPlaceholder" style="background:#0f172a;color:#94a3b8;border-radius:12px;height:160px;display:none;align-items:center;justify-content:center;font-size:13px;padding:16px;">
+          Camera mode is disabled. Interview works completely with voice or text!
+        </div>
+
+        <!-- Telemetry Indicators -->
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <span id="badgeFace" class="badge badge-secondary">Face: Centered</span>
+          <span id="badgeLighting" class="badge badge-secondary">Lighting: Optimal</span>
+        </div>
+
+        <!-- Ethical Disclaimer Pill -->
+        <div style="margin-top:12px;background:rgba(79,70,229,0.05);border:1px solid rgba(79,70,229,0.15);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--text-muted);line-height:1.4;text-align:left;">
+          <!-- 🛡 <strong>Local Positioning Aid:</strong> Runs 100% locally in your browser. This camera feature only assists with head framing and lighting. It does NOT analyze personality, emotion, or hiring suitability. -->
+           <p>KEEP FACE IN THE CIRCLE IN THE VISION</p>
+        </div>
+      </div>
+
+      <!-- Session Telemetry & Context Card -->
+      <div class="card" style="font-size:13px;line-height:1.5;">
+        <h4 style="margin-top:0;margin-bottom:10px;font-size:14px;display:flex;align-items:center;gap:6px;">
+          <span>🎯</span><span>Live Interview Context</span>
+        </h4>
+        <div style="margin-bottom:6px;"><strong>Target Role:</strong> <span id="ctxRole">-</span></div>
+        <div style="margin-bottom:6px;"><strong>Target Level:</strong> <span id="ctxLevel">-</span></div>
+        <div style="margin-bottom:6px;"><strong>Interview Mode:</strong> <span id="ctxType">-</span></div>
+        <div style="margin-bottom:6px;"><strong>Questions Configured:</strong> <span id="ctxCount">-</span></div>
+        <!-- <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--glass-border);font-size:12px;color:var(--text-muted);">
+          Each question is generated adaptively based on the depth and topics covered in your previous answers.
+        </div> -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/presentation-assist.js"></script>
+<script src="js/interview-room.js"></script>
+</body>
+</html>
